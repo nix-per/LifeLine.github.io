@@ -296,9 +296,9 @@ export default function DonorDashboard() {
                 icon={<Clock className="h-6 w-6 text-white" />}
                 iconBg="bg-emerald-500"
                 label="Next Eligible"
-                value="Now"
-                subtext="You can donate now!"
-                isHighlight={true}
+                value={profile.isEligible ? 'Now' : 'N/A'}
+                subtext={profile.isEligible ? 'You can donate now' : 'Not eligible to donate'}
+                isHighlight={profile.isEligible ? true : false}
               />
             </div>
 
