@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getDonationCamps, deleteOldCamps } from '../lib/firestore';
-import { MapPin, Calendar, User, Phone, Droplet, Clock, History } from 'lucide-react';
+import { MapPin, Calendar, User, Phone, Droplet, Clock, History, Navigation } from 'lucide-react';
 
 export default function DonationCampsPage() {
     const [upcomingCamps, setUpcomingCamps] = useState([]);
@@ -114,6 +114,14 @@ export default function DonationCampsPage() {
 }
 
 function CampCard({ camp, isPast }) {
+    const handleNavigation = () => {
+        if (camp.location && camp.location.lat && camp.location.lng) {
+            window.open(`https://www.google.com/maps/dir/?api=1&destination=${camp.location.lat},${camp.location.lng}`, '_blank');
+        } else {
+            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(camp.address)}`, '_blank');
+        }
+    };
+
     return (
         <div className={`bg-white rounded-2xl shadow-sm border overflow-hidden transition-all ${isPast ? 'border-slate-100 opacity-75 hover:opacity-100' : 'border-slate-100 hover:shadow-md hover:border-brand-100'}`}>
             <div className={`p-6 border-b ${isPast ? 'bg-slate-50 border-slate-100' : 'bg-brand-50 border-brand-100'}`}>
@@ -170,12 +178,20 @@ function CampCard({ camp, isPast }) {
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
                 <button
                     disabled={isPast}
+                    onClick={isPast ? undefined : handleNavigation}
                     className={`w-full font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 ${isPast
                         ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
                         : 'bg-slate-900 hover:bg-slate-800 text-white'
                         }`}
                 >
-                    {isPast ? 'Event Completed' : 'View Details'}
+                    {isPast ? (
+                        'Event Completed'
+                    ) : (
+                        <>
+                            <Navigation className="h-4 w-4" />
+                            Get Directions
+                        </>
+                    )}
                 </button>
             </div>
         </div>
