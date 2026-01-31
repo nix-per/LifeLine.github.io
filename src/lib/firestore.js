@@ -113,9 +113,12 @@ export const searchDonors = async (bloodType, location) => {
           donorProfile: {
             bloodType: data.bloodType,
             city: data.location,
-            phone: 'Hospital' // Placeholder or add real hospital phone if available
+            phone: data.phoneNumber || '', // Include phone number from inventory
           },
-          email: 'Hospital Inventory' // Placeholder
+          email: 'Hospital Inventory', // Placeholder
+          hospitalName: data.hospitalName,
+          address: data.address,
+          locationCoordinates: data.location // {lat, lng}
         });
       }
     });
