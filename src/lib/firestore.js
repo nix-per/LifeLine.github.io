@@ -489,3 +489,102 @@ export const deleteOldCamps = async () => {
         // Don't throw here to avoid blocking UI rendering
     }
 };
+
+// Appointment System
+export const bookAppointment = async (appointmentData) => {
+  try {
+    const { venueId, date, timeSlot } = appointmentData;
+    
+    // 1. Check Capacity (Max 2)
+    const q = query(
+      collection(db, 'appointments'),
+      where('venueId', '==', venueId),
+      where('date', '==', date),
+      where('timeSlot', '==', timeSlot),
+      where('status', '==', 'scheduled')
+    );
+    
+    const snapshot = await getDocs(q);
+    if (snapshot.size >= 2) {
+      throw new Error("This time slot is fully booked. Please choose another.");
+    }
+
+    // 2. Create Appointment
+    const apptRef = doc(collection(db, 'appointments'));
+    await setDoc(apptRef, {
+      ...appointmentData,
+      status: 'scheduled',
+      createdAt: new Date().toISOString()
+    });
+    
+    return apptRef.id;
+  } catch (error) {
+    console.error("Error booking appointment:", error);
+    throw error;
+  }
+};
+
+export const getDonorAppointments = async (donorId) => {
+  try {
+    const q = query(
+      collection(db, 'appointments'),
+      where('donorId', '==', donorId),
+      where('status', 'in', ['scheduled', 'completed', 'cancelled'])
+    );
+    const snapshot = await getDocs(q);
+    const appointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Sort locally by date desc
+    return appointments.sort((a, b) => new Date(b.date) - new Date(a.date));
+  } catch (error) {
+    console.error("Error getting appointments:", error);
+    throw error;
+  }
+};
+
+export const cancelAppointment = async (appointmentId) => {
+  try {
+    await updateDoc(doc(db, 'appointments', appointmentId), {
+      status: 'cancelled',
+      updatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("Error cancelling appointment:", error);
+    throw error;
+  }
+};
+
+export const getVenues = async () => {
+  try {
+    // Fetch Hospitals
+    const hospQ = query(collection(db, 'inventory'), where('status', '==', 'active'));
+    const hospSnap = await getDocs(hospQ);
+    const hospitals = hospSnap.docs.map(doc => ({
+      id: doc.id,
+      name: doc.data().hospitalName,
+      type: 'hospital',
+      address: doc.data().address,
+      location: doc.data().location // {lat, lng}
+    }));
+
+    // Fetch Camps
+    const campQ = query(collection(db, 'donationCamps'), where('status', '==', 'upcoming'));
+    const campSnap = await getDocs(campQ);
+    const camps = campSnap.docs.map(doc => ({
+      id: doc.id,
+      name: doc.data().campName || doc.data().organizerName, // Fallback
+      type: 'camp',
+      address: doc.data().location,
+      // Camps might store address in 'location' string, or have coordinates if enhanced.
+      // Assuming simple string for now unless structure updated. 
+      // If coordinates exist, they should be returned too.
+      // Note: 'location' field in camps is often a string address in this schema.
+      // If we add lat/lng to camps later, add it here.
+    }));
+
+    return [...hospitals, ...camps];
+  } catch (error) {
+    console.error("Error getting venues:", error);
+    throw error;
+  }
+};

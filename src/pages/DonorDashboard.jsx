@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { User, Calendar, Droplet, Clock, ChevronRight, AlertCircle, Plus, CheckCircle, Lock, MessageCircle } from 'lucide-react';
+import { User, Calendar, Droplet, Clock, ChevronRight, AlertCircle, Plus, CheckCircle, Lock, MessageCircle, MapPin, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { getUserProfile, updateDonorStatus, subscribeToBloodRequests, updateRequestStatus } from '../lib/firestore';
+import {
+  getUserProfile,
+  updateDonorStatus,
+  subscribeToBloodRequests,
+  updateRequestStatus,
+  bookAppointment,
+  getDonorAppointments,
+  cancelAppointment,
+  getVenues
+} from '../lib/firestore';
 import DonorEligibilityQuiz from '../components/DonorEligibilityQuiz';
 import { Toaster, toast } from 'react-hot-toast';
 
@@ -13,10 +22,64 @@ export default function DonorDashboard() {
   const [showQuiz, setShowQuiz] = useState(false);
   const [bloodRequests, setBloodRequests] = useState([]);
 
+  // Appointment State
+  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [venues, setVenues] = useState([]);
+  const [filteredVenues, setFilteredVenues] = useState([]);
+  const [venueTab, setVenueTab] = useState('hospital'); // 'hospital' or 'camp'
+  const [locationFilter, setLocationFilter] = useState('');
+  const [userLocation, setUserLocation] = useState(null);
+
+  const [upcomingAppointments, setUpcomingAppointments] = useState([]);
+  const [bookingData, setBookingData] = useState({
+    venueId: '',
+    venueName: '',
+    venueType: '',
+    date: '',
+    timeSlot: ''
+  });
+  const [isBooking, setIsBooking] = useState(false);
+
   // Form state
   const [bloodType, setBloodType] = useState('');
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
+
+  // Get User Location for Proximity Sorting
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.log("Location access denied or error:", error);
+          // Default to NY or just don't sort by distance
+        }
+      );
+    }
+  }, []);
+
+  // Helper function to calculate distance
+  const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Radius of the earth in km
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const d = R * c; // Distance in km
+    return d.toFixed(1);
+  };
+
+  const deg2rad = (deg) => {
+    return deg * (Math.PI / 180);
+  };
 
   useEffect(() => {
     async function fetchProfile() {
@@ -28,6 +91,56 @@ export default function DonorDashboard() {
     }
     fetchProfile();
   }, [currentUser, showQuiz]); // Refresh when quiz closes (showQuiz changes)
+
+  // Fetch Appointments & Venues
+  useEffect(() => {
+    async function loadData() {
+      if (currentUser && profile?.isDonor) {
+        try {
+          const appts = await getDonorAppointments(currentUser.uid);
+          setUpcomingAppointments(appts);
+
+          const venueList = await getVenues();
+          setVenues(venueList);
+        } catch (error) {
+          console.error("Error loading dashboard data:", error);
+        }
+      }
+    }
+    loadData();
+  }, [currentUser, profile]);
+
+  // Filter and Sort Venues
+  useEffect(() => {
+    let result = venues.filter(v => v.type === venueTab);
+
+    // Filter by Location Search
+    if (locationFilter) {
+      const search = locationFilter.toLowerCase();
+      result = result.filter(v =>
+        (typeof v.address === 'string' && v.address.toLowerCase().includes(search)) ||
+        (v.name.toLowerCase().includes(search))
+      );
+    }
+
+    // Sort by Proximity if User Location is available
+    if (userLocation) {
+      result = result.map(v => {
+        let distance = null;
+        if (v.location && v.location.lat && v.location.lng) {
+          distance = parseFloat(getDistanceFromLatLonInKm(userLocation.lat, userLocation.lng, v.location.lat, v.location.lng));
+        }
+        return { ...v, distance };
+      }).sort((a, b) => {
+        if (a.distance !== null && b.distance !== null) return a.distance - b.distance;
+        if (a.distance !== null) return -1;
+        if (b.distance !== null) return 1;
+        return 0;
+      });
+    }
+
+    setFilteredVenues(result);
+  }, [venues, venueTab, locationFilter, userLocation]);
 
   // Listen for real-time blood requests
   useEffect(() => {
@@ -99,6 +212,55 @@ export default function DonorDashboard() {
     setProfile(data);
   };
 
+  const handleBookAppointment = async (e) => {
+    e.preventDefault();
+    if (!bookingData.venueId || !bookingData.date || !bookingData.timeSlot) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    setIsBooking(true);
+    try {
+      await bookAppointment({
+        donorId: currentUser.uid,
+        donorName: profile.name,
+        ...bookingData
+      });
+
+      toast.success("Appointment Scheduled Successfully!");
+      setShowAppointmentModal(false);
+
+      // Refresh list
+      const appts = await getDonorAppointments(currentUser.uid);
+      setUpcomingAppointments(appts);
+
+      // Reset form
+      setBookingData({
+        venueId: '',
+        venueName: '',
+        venueType: '',
+        date: '',
+        timeSlot: ''
+      });
+    } catch (error) {
+      toast.error(error.message || "Failed to book appointment");
+    }
+    setIsBooking(false);
+  };
+
+  const handleCancelAppointment = async (apptId) => {
+    if (!window.confirm("Are you sure you want to cancel this appointment?")) return;
+    try {
+      await cancelAppointment(apptId);
+      toast.success("Appointment cancelled");
+      // Refresh list
+      const appts = await getDonorAppointments(currentUser.uid);
+      setUpcomingAppointments(appts);
+    } catch (error) {
+      toast.error("Failed to cancel");
+    }
+  };
+
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   if (!currentUser) return (
@@ -112,6 +274,154 @@ export default function DonorDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
+      {/* Appointment Modal */}
+      {showAppointmentModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg p-6 relative animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setShowAppointmentModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 z-10"
+            >
+              <X className="h-6 w-6" />
+            </button>
+
+            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2 sticky top-0 bg-white z-10 pb-2">
+              <Calendar className="h-6 w-6 text-brand-500" />
+              Schedule Donation
+            </h2>
+
+            <form onSubmit={handleBookAppointment} className="space-y-6">
+
+              {/* Step 1: Venue Selection */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Select Venue</label>
+
+                {/* Tabs */}
+                <div className="flex p-1 bg-slate-100 rounded-xl mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setVenueTab('hospital')}
+                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${venueTab === 'hospital' ? 'bg-white text-brand-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                  >
+                    Hospitals
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVenueTab('camp')}
+                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${venueTab === 'camp' ? 'bg-white text-brand-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                  >
+                    Upcoming Camps
+                  </button>
+                </div>
+
+                {/* Search Filter */}
+                <div className="relative mb-4">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <MapPin className="h-4 w-4 text-slate-400" />
+                  </div>
+                  <input
+                    type="text"
+                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:border-brand-500 outline-none text-sm"
+                    placeholder="Filter by City or Area..."
+                    value={locationFilter}
+                    onChange={(e) => setLocationFilter(e.target.value)}
+                  />
+                </div>
+
+                {/* Venue List */}
+                <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+                  {filteredVenues.length > 0 ? (
+                    filteredVenues.map(v => (
+                      <div
+                        key={v.id}
+                        onClick={() => {
+                          setBookingData({
+                            ...bookingData,
+                            venueId: v.id,
+                            venueName: v.name,
+                            venueType: v.type
+                          });
+                        }}
+                        className={`p-3 rounded-xl border cursor-pointer transition-all hover:border-brand-300 relative ${bookingData.venueId === v.id
+                          ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500'
+                          : 'border-slate-200 bg-white'
+                          }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-bold text-slate-900 text-sm">{v.name}</h4>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {typeof v.address === 'string' ? v.address : 'View Map for Location'}
+                            </p>
+                          </div>
+                          {v.distance && (
+                            <span className="text-xs font-bold text-blue-600 whitespace-nowrap bg-blue-50 px-2 py-0.5 rounded-full">
+                              {v.distance} km
+                            </span>
+                          )}
+                        </div>
+                        {bookingData.venueId === v.id && (
+                          <div className="absolute top-3 right-3 text-brand-500">
+                            <CheckCircle className="h-5 w-5 fill-brand-100" />
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                      <MapPin className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-sm text-slate-500 font-medium">No registered venues found in this area yet.</p>
+                      <p className="text-xs text-slate-400">Try a different search term.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Step 2: Date & Time (Only show if venue selected) */}
+              <div className={`transition-all duration-300 ${bookingData.venueId ? 'opacity-100' : 'opacity-50 pointer-events-none grayscale'}`}>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                    <input
+                      type="date"
+                      required={!!bookingData.venueId}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-brand-500 outline-none text-sm"
+                      value={bookingData.date}
+                      onChange={(e) => setBookingData({ ...bookingData, date: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Time Slot</label>
+                    <select
+                      className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-brand-500 outline-none text-sm"
+                      value={bookingData.timeSlot}
+                      onChange={(e) => setBookingData({ ...bookingData, timeSlot: e.target.value })}
+                      required={!!bookingData.venueId}
+                    >
+                      <option value="">Select Time</option>
+                      <option value="10:00 AM">10:00 AM</option>
+                      <option value="01:00 PM">01:00 PM</option>
+                      <option value="04:00 PM">04:00 PM</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isBooking || !bookingData.venueId}
+                  className="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold shadow-md transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+                >
+                  {isBooking ? 'Checking Availability...' : 'Confirm Booking'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <Toaster />
       {showQuiz && (
         <DonorEligibilityQuiz
@@ -133,7 +443,10 @@ export default function DonorDashboard() {
             // ... existing buttons ...
             <div className="flex gap-3">
               {profile?.isEligible ? (
-                <button className="bg-brand-500 hover:bg-brand-600 text-white px-6 py-2.5 rounded-xl font-medium shadow-sm transition-colors flex items-center gap-2">
+                <button
+                  onClick={() => setShowAppointmentModal(true)}
+                  className="bg-brand-500 hover:bg-brand-600 text-white px-6 py-2.5 rounded-xl font-medium shadow-sm transition-colors flex items-center gap-2"
+                >
                   <Calendar className="h-4 w-4" />
                   Schedule Donation
                 </button>
@@ -160,6 +473,49 @@ export default function DonorDashboard() {
             </div>
           )}
         </div>
+
+        {/* Upcoming Appointments Section */}
+        {profile?.isDonor && upcomingAppointments.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-brand-500" />
+              My Upcoming Appointments
+            </h2>
+            <div className="grid md:grid-cols-2 gap-4">
+              {upcomingAppointments.map(appt => (
+                <div key={appt.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${appt.status === 'scheduled' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                        {appt.status.toUpperCase()}
+                      </span>
+                      <span className="text-slate-500 text-sm flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {new Date(appt.date).toLocaleDateString()} @ {appt.timeSlot}
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-lg text-slate-900">
+                      {appt.venueName}
+                    </h3>
+                    <p className="text-sm text-slate-500 flex items-center gap-1 mt-1">
+                      <MapPin className="h-3 w-3" /> {appt.venueType === 'hospital' ? 'Hospital Visit' : 'Donation Camp'}
+                    </p>
+                  </div>
+
+                  {appt.status === 'scheduled' && (
+                    <button
+                      onClick={() => handleCancelAppointment(appt.id)}
+                      className="px-4 py-2 border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Blood Requests Section */}
         {profile?.isDonor && bloodRequests.length > 0 && (
