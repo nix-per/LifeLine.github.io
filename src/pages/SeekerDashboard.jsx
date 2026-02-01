@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, MapPin, Filter, Phone, Droplet, AlertCircle, Bell, Trash2, Building, User, Navigation, Heart, CheckCircle, XCircle, Archive, Clock } from 'lucide-react';
+import { Search, MapPin, Filter, Phone, Droplet, AlertCircle, Bell, Trash2, Building, User, Navigation, Heart, CheckCircle, XCircle, Archive, Clock, Share2, Copy, X } from 'lucide-react';
 import { searchDonors, addToWatchlist, getWatchlist, subscribeToMatchingInventory, subscribeToAllInventory, requestBlood, subscribeToSentRequests, cancelRequest, archiveRequest, markRequestsFulfilled } from '../lib/firestore';
 import { useAuth } from '../context/AuthContext';
 import { Toaster, toast } from 'react-hot-toast';
@@ -39,6 +39,7 @@ export default function SeekerDashboard() {
     const [donors, setDonors] = useState([]);
     const [hospitals, setHospitals] = useState([]);
     const [userLocation, setUserLocation] = useState(null);
+    const [selectedHospitalForShare, setSelectedHospitalForShare] = useState(null);
 
     // UI States
     const [loading, setLoading] = useState(false);
@@ -261,9 +262,76 @@ export default function SeekerDashboard() {
         return hasStock && matchesLocation;
     });
 
+    const handleShareDetails = (hospital) => {
+        setSelectedHospitalForShare(hospital);
+    };
+
+    const copyToClipboard = (text) => {
+        navigator.clipboard.writeText(text).then(() => {
+            toast.success("Details copied to clipboard!");
+            setSelectedHospitalForShare(null);
+        }).catch((err) => {
+            console.error('Failed to copy: ', err);
+            toast.error("Failed to copy details.");
+        });
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
             <Toaster position="top-center" />
+            
+            {/* Share Details Modal */}
+            {selectedHospitalForShare && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-float">
+                        <div className="p-6">
+                            <div className="flex justify-between items-start mb-4">
+                                <h3 className="text-xl font-bold text-slate-900">Hospital Details</h3>
+                                <button 
+                                    onClick={() => setSelectedHospitalForShare(null)}
+                                    className="text-slate-400 hover:text-slate-600 transition-colors"
+                                >
+                                    <X className="h-6 w-6" />
+                                </button>
+                            </div>
+                            
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-6">
+                                <p className="font-bold text-lg text-slate-900 mb-2">{selectedHospitalForShare.hospitalName}</p>
+                                <div className="space-y-2 text-sm text-slate-600">
+                                    <p className="flex items-start gap-2">
+                                        <MapPin className="h-4 w-4 mt-0.5 text-slate-400 shrink-0" />
+                                        {selectedHospitalForShare.address}
+                                    </p>
+                                    {selectedHospitalForShare.phoneNumber && (
+                                        <p className="flex items-center gap-2">
+                                            <Phone className="h-4 w-4 text-slate-400 shrink-0" />
+                                            {selectedHospitalForShare.phoneNumber}
+                                        </p>
+                                    )}
+                                    {selectedHospitalForShare.email && (
+                                        <p className="flex items-center gap-2">
+                                            <User className="h-4 w-4 text-slate-400 shrink-0" />
+                                            {selectedHospitalForShare.email}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    const details = `Hospital Name: ${selectedHospitalForShare.hospitalName}\nAddress: ${selectedHospitalForShare.address}\nPhone: ${selectedHospitalForShare.phoneNumber || 'N/A'}\nEmail: ${selectedHospitalForShare.email || 'N/A'}`;
+                                    copyToClipboard(details);
+                                }}
+                                className="w-full py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-200"
+                            >
+                                <Copy className="h-5 w-5" />
+                                Copy Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="max-w-5xl mx-auto">
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-bold text-slate-900">Find Blood & Donors</h1>
@@ -515,7 +583,7 @@ export default function SeekerDashboard() {
                                                     <Droplet className="h-3.5 w-3.5 text-red-500" /> {totalStock} units
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-slate-400 mt-2 line-clamp-2 sm:line-clamp-1">
+                                            <p className="text-xs text-slate-400 mt-2 line-clamp-3">
                                                 {hospital.address}
                                             </p>
                                         </div>
@@ -549,6 +617,14 @@ export default function SeekerDashboard() {
                                                     <span>No Phone</span>
                                                 </button>
                                             )}
+                                            
+                                            <button
+                                                onClick={() => handleShareDetails(hospital)}
+                                                className="col-span-2 lg:col-span-1 flex-1 px-3 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs sm:text-sm font-bold hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <Share2 className="h-4 w-4" />
+                                                <span>Share Details</span>
+                                            </button>
                                         </div>
                                     </div>
                                 );

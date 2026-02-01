@@ -76,7 +76,8 @@ export const searchDonors = async (bloodType, location) => {
     
     // 1. Search Individual Donors
     const usersRef = collection(db, 'users');
-    let qUsers = query(usersRef, where("isDonor", "==", true));
+    // Filter for donors who are both registered (isDonor) and eligible (isEligible)
+    let qUsers = query(usersRef, where("isDonor", "==", true), where("isEligible", "==", true));
     
     if (bloodType) {
       qUsers = query(qUsers, where("donorProfile.bloodType", "==", bloodType));
