@@ -89,10 +89,11 @@ const Chatbot = () => {
 
         try {
           // Query Firestore for matching donors
-          // Schema matches ProfileSettings.jsx: isDonor (bool), donorProfile.bloodType (string), donorProfile.city (string)
+          // Schema matches ProfileSettings.jsx: isDonor (bool), isEligible (bool), donorProfile.bloodType (string), donorProfile.city (string)
           const q = query(
             collection(db, "users"),
             where("isDonor", "==", true),
+            where("isEligible", "==", true),
             where("donorProfile.bloodType", "==", emergencyData.bloodGroup),
             where("donorProfile.city", "==", city)
           );

@@ -42,6 +42,65 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* How Blood Donation Works Section */}
+      <section className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-20">
+            <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900">How Blood Donation Works</h2>
+            <p className="mt-4 text-xl text-slate-600 max-w-2xl mx-auto">A simple 3-step process to saving a life.</p>
+          </div>
+
+          <div className="relative">
+            {/* Connecting Line (Desktop) */}
+            <div className="hidden md:block absolute top-1/2 left-0 w-full h-1 bg-gradient-to-r from-red-100 via-red-200 to-red-100 -translate-y-1/2 z-0 rounded-full"></div>
+            
+            <div className="grid md:grid-cols-3 gap-12 relative z-10">
+              {/* Step 1 */}
+              <div className="flex flex-col items-center text-center group">
+                <div className="w-24 h-24 bg-white border-4 border-red-100 rounded-full flex items-center justify-center shadow-lg mb-8 relative transition-all duration-300 group-hover:border-brand-400 group-hover:scale-110">
+                  <span className="text-4xl font-bold text-brand-500 group-hover:text-brand-600">1</span>
+                  <div className="absolute -bottom-3 bg-brand-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md">REGISTER</div>
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800 mb-4">Registration Process</h3>
+                <p className="text-slate-600 leading-relaxed px-4">
+                  Sign up and schedule your first donation with ease. It takes less than 10 minutes.
+                </p>
+              </div>
+
+              {/* Step 2 */}
+              <div className="flex flex-col items-center text-center group">
+                <div className="w-24 h-24 bg-white border-4 border-red-100 rounded-full flex items-center justify-center shadow-lg mb-8 relative transition-all duration-300 group-hover:border-brand-400 group-hover:scale-110">
+                  <span className="text-4xl font-bold text-brand-500 group-hover:text-brand-600">2</span>
+                  <div className="absolute -bottom-3 bg-brand-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md">SCREENING</div>
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800 mb-4">Health Screening</h3>
+                <p className="text-slate-600 leading-relaxed px-4">
+                  A simple check-up to ensure you’re ready to donate. We check your pulse, blood pressure, and hemoglobin.
+                </p>
+              </div>
+
+              {/* Step 3 */}
+              <div className="flex flex-col items-center text-center group">
+                <div className="w-24 h-24 bg-white border-4 border-red-100 rounded-full flex items-center justify-center shadow-lg mb-8 relative transition-all duration-300 group-hover:border-brand-400 group-hover:scale-110">
+                  <span className="text-4xl font-bold text-brand-500 group-hover:text-brand-600">3</span>
+                  <div className="absolute -bottom-3 bg-brand-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md">DONATE</div>
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800 mb-4">Donation Day</h3>
+                <p className="text-slate-600 leading-relaxed px-4">
+                  Relax as our professional staff guide you through. The actual donation takes just 8-10 minutes.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-20 text-center">
+            <Link to="/camps" className="inline-flex items-center justify-center px-10 py-4 text-lg font-bold rounded-full text-white bg-slate-900 hover:bg-slate-800 shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-1">
+              Start Your Journey <ArrowRight className="ml-2 h-5 w-5" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Features Section */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -66,6 +125,68 @@ export default function LandingPage() {
               title="Verified & Secure"
               description="All donors and requests are verified to ensure safety and trust in the platform."
             />
+          </div>
+        </div>
+      </section>
+
+      {/* Benefits of Blood Donation Section */}
+      <section className="py-20 bg-slate-50 border-t border-slate-200 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12 relative z-10">
+            <h2 className="text-3xl font-bold text-slate-900">Benefits of Blood Donation</h2>
+            <p className="mt-4 text-lg text-slate-600">Giving blood helps others and is good for you too.</p>
+          </div>
+
+          {/* Floating Bubbles Container */}
+          <div className="flex flex-wrap justify-center items-center gap-2 max-w-4xl mx-auto py-10 relative">
+            
+            {/* Mixed Bubbles */}
+            {[
+              { type: 'benefit', text: 'Saves 3 Lives' },
+              { type: 'group', text: 'O+' },
+              { type: 'benefit', text: 'Free Health Checkup' },
+              { type: 'group', text: 'A-' },
+              { type: 'benefit', text: 'Reduces Cancer Risk' },
+              { type: 'group', text: 'B+' },
+              { type: 'benefit', text: 'Improves Heart Health' },
+              { type: 'group', text: 'AB+' },
+              { type: 'benefit', text: 'Burns Calories' },
+              { type: 'group', text: 'O-' },
+              { type: 'benefit', text: 'New Blood Cells' },
+              { type: 'group', text: 'A+' },
+              { type: 'benefit', text: 'Mental Well-being' },
+              { type: 'group', text: 'B-' },
+              { type: 'benefit', text: 'Community Impact' },
+              { type: 'group', text: 'AB-' },
+              { type: 'benefit', text: 'Free Blood Analysis' },
+              { type: 'benefit', text: 'Lower Cholesterol' },
+            ].map((item, index) => {
+               // Deterministic random-like delay based on index
+               const delay = `${(index * 0.2) % 2}s`;
+               const isBenefit = item.type === 'benefit';
+               
+               // Staggered layout logic
+               let positionClass = '';
+               if (index % 3 === 0) positionClass = 'mt-8';
+               if (index % 3 === 1) positionClass = '-mt-4';
+               
+               return (
+                 <div
+                   key={index}
+                   className={`
+                     animate-float flex items-center justify-center text-center rounded-full shadow-sm hover:shadow-xl transition-all duration-300 cursor-default border border-red-200
+                     ${positionClass}
+                     ${isBenefit 
+                        ? 'w-32 h-32 md:w-40 md:h-40 bg-red-50 text-red-900 font-bold text-sm md:text-base p-4 z-10 hover:bg-red-100 hover:scale-105' 
+                        : 'w-12 h-12 md:w-16 md:h-16 bg-red-200 text-red-900 font-bold text-xs md:text-sm z-0 hover:bg-red-300 hover:scale-110 opacity-90'
+                     }
+                   `}
+                   style={{ animationDelay: delay }}
+                 >
+                   {item.text}
+                 </div>
+               );
+            })}
           </div>
         </div>
       </section>
