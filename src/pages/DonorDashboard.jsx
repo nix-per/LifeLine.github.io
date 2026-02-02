@@ -3,6 +3,7 @@ import { User, Calendar, Droplet, Clock, ChevronRight, AlertCircle, Plus, CheckC
 import { useAuth } from '../context/AuthContext';
 import {
   getUserProfile,
+  subscribeToUserProfile,
   updateDonorStatus,
   subscribeToBloodRequests,
   updateRequestStatus,
@@ -11,6 +12,7 @@ import {
   cancelAppointment,
   getVenues
 } from '../lib/firestore';
+import { sendRequestAcceptedNotification } from '../lib/emailService';
 import DonorEligibilityQuiz from '../components/DonorEligibilityQuiz';
 import { Toaster, toast } from 'react-hot-toast';
 
@@ -86,14 +88,25 @@ export default function DonorDashboard() {
   };
 
   useEffect(() => {
+    let unsubscribe;
+    
     async function fetchProfile() {
       if (currentUser) {
-        const data = await getUserProfile(currentUser.uid);
-        setProfile(data);
+        // Initial fetch to show something quickly (optional, but good for perceived speed)
+        // Then subscribe for updates
+        unsubscribe = subscribeToUserProfile(currentUser.uid, (data) => {
+          setProfile(data);
+          setLoading(false);
+        });
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     }
     fetchProfile();
+    
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [currentUser, showQuiz]); // Refresh when quiz closes (showQuiz changes)
 
   // Fetch Appointments & Venues
@@ -183,6 +196,16 @@ export default function DonorDashboard() {
 
       if (status === 'accepted') {
         toast.success(`Request accepted! Seeker will be notified.`);
+        
+        // Find the request to get Seeker ID
+        const request = bloodRequests.find(r => r.id === requestId);
+        if (request && request.seekerId) {
+             sendRequestAcceptedNotification(request.seekerId, {
+                name: profile.name || 'A Donor',
+                phone: donorPhone,
+                bloodType: profile.donorProfile?.bloodType || 'Unknown'
+             });
+        }
       } else {
         toast.success(`Request rejected.`);
       }

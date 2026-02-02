@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, MapPin, Filter, Phone, Droplet, AlertCircle, Bell, Trash2, Building, User, Navigation, Heart, CheckCircle, XCircle, Archive, Clock, Share2, Copy, X } from 'lucide-react';
-import { searchDonors, addToWatchlist, getWatchlist, subscribeToMatchingInventory, subscribeToAllInventory, requestBlood, subscribeToSentRequests, cancelRequest, archiveRequest, markRequestsFulfilled } from '../lib/firestore';
+import { searchDonors, addToWatchlist, getWatchlist, subscribeToMatchingInventory, subscribeToAllInventory, requestBlood, subscribeToSentRequests, cancelRequest, archiveRequest, markRequestsFulfilled, getUserProfile } from '../lib/firestore';
+import { sendBloodRequestNotification } from '../lib/emailService';
 import { useAuth } from '../context/AuthContext';
 import { Toaster, toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -51,6 +52,7 @@ export default function SeekerDashboard() {
     const [addingToWatchlist, setAddingToWatchlist] = useState(false);
     const [sentRequests, setSentRequests] = useState([]);
     const [requestFilter, setRequestFilter] = useState('active'); // 'active' | 'past'
+    const [seekerProfile, setSeekerProfile] = useState(null);
 
     // Get User Location on mount
     useEffect(() => {
@@ -66,6 +68,15 @@ export default function SeekerDashboard() {
             );
         }
     }, []);
+
+    // Fetch Seeker Profile
+    useEffect(() => {
+        if (currentUser) {
+            getUserProfile(currentUser.uid).then(profile => {
+                setSeekerProfile(profile);
+            }).catch(err => console.error("Error fetching profile:", err));
+        }
+    }, [currentUser]);
 
     // Fetch Real-time Hospital Inventory
     useEffect(() => {
@@ -233,6 +244,18 @@ export default function SeekerDashboard() {
                 bloodType || donor.donorProfile.bloodType,
                 donor.name || donor.email.split('@')[0]
             );
+
+            // Send email notification using registered location
+            const registeredLocation = seekerProfile?.donorProfile?.city || seekerProfile?.address || seekerProfile?.city || location || 'Unknown Location';
+            
+            await sendBloodRequestNotification([donor], {
+                bloodType: bloodType || donor.donorProfile.bloodType || 'Any',
+                location: registeredLocation,
+                seekerName: currentUser.displayName || currentUser.email.split('@')[0],
+                urgency: 'High',
+                link: `${window.location.origin}/dashboard`
+            });
+
             toast.success(`Request sent to ${donor.name || donor.email.split('@')[0]}!`, { id: loadingToast });
         } catch (error) {
             console.error("Error requesting blood:", error);
@@ -264,6 +287,58 @@ export default function SeekerDashboard() {
 
     const handleShareDetails = (hospital) => {
         setSelectedHospitalForShare(hospital);
+    };
+
+    const handleBroadcastNotification = async () => {
+        if (donors.length === 0) return;
+        if (!currentUser) {
+            navigate('/login');
+            return;
+        }
+
+        if (!window.confirm(`Are you sure you want to send an emergency email notification AND blood requests to all ${donors.length} donors in this list?`)) {
+            return;
+        }
+
+        const loadingToast = toast.loading('Processing emergency broadcast...');
+
+        // Determine registered location
+        const registeredLocation = seekerProfile?.donorProfile?.city || seekerProfile?.address || seekerProfile?.city || location || 'Unknown Location';
+        const seekerName = currentUser.displayName || currentUser.email.split('@')[0];
+
+        try {
+            // 1. Create database requests for each donor
+            // We handle individual failures so one bad request doesn't stop the whole batch
+            const requestPromises = donors.map(donor => 
+                requestBlood(
+                    currentUser.uid,
+                    seekerName,
+                    donor.id,
+                    bloodType || donor.donorProfile.bloodType,
+                    donor.name || donor.email.split('@')[0]
+                ).catch(err => {
+                    console.error(`Failed to request blood from donor ${donor.id}:`, err);
+                    return null; 
+                })
+            );
+
+            // 2. Send email notifications
+            const emailPromise = sendBloodRequestNotification(donors, {
+                bloodType: bloodType || 'Any',
+                location: registeredLocation,
+                seekerName: seekerName,
+                urgency: 'High',
+                link: window.location.origin + '/dashboard'
+            });
+
+            // Execute all operations
+            await Promise.all([...requestPromises, emailPromise]);
+
+            toast.success(`Broadcast sent! Requests created and emails sent to ${donors.length} donors.`, { id: loadingToast });
+        } catch (error) {
+            console.error("Error in broadcast:", error);
+            toast.error("Broadcast completed with some errors. Check console.", { id: loadingToast });
+        }
     };
 
     const copyToClipboard = (text) => {
@@ -639,6 +714,22 @@ export default function SeekerDashboard() {
                             <User className="h-5 w-5 text-red-600" />
                             Available Donors {hasSearched && `(${donors.length})`}
                         </h2>
+
+                        {donors.length > 0 && (
+                            <div className="mb-4 p-4 bg-red-50 border border-red-100 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <div>
+                                    <h3 className="font-bold text-red-800">Emergency Broadcast</h3>
+                                    <p className="text-sm text-red-600">Send an urgent email notification to all {donors.length} donors in this list.</p>
+                                </div>
+                                <button
+                                    onClick={handleBroadcastNotification}
+                                    className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors shadow-lg shadow-red-200 flex items-center gap-2 whitespace-nowrap"
+                                >
+                                    <Bell className="h-4 w-4" />
+                                    Notify All
+                                </button>
+                            </div>
+                        )}
 
                         {!hasSearched && donors.length === 0 && (
                             <div className="text-center py-12 bg-white rounded-xl border border-slate-100">
