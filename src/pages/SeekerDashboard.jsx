@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, MapPin, Filter, Phone, Droplet, AlertCircle, Bell, Trash2, Building, User, Navigation, Heart, CheckCircle, XCircle, Archive, Clock, Share2, Copy, X, Loader2 } from 'lucide-react';
+import { Search, MapPin, Filter, Phone, Droplet, AlertCircle, Bell, Trash2, Building, User, Navigation, Heart, CheckCircle, XCircle, Archive, Clock, Share2, Copy, X, Loader2,Mail } from 'lucide-react';
 import { searchDonors, addToWatchlist, getWatchlist, deleteWatchlistItem, markWatchlistNotified, markWatchlistMatchFound, resetWatchlistMatch, subscribeToMatchingInventory, subscribeToAllInventory, subscribeToActiveDonors, requestBlood, subscribeToSentRequests, cancelRequest, archiveRequest, markRequestsFulfilled, getUserProfile } from '../lib/firestore';
 import { sendBloodRequestNotification } from '../lib/emailService';
 import { useAuth } from '../context/AuthContext';
@@ -472,7 +472,7 @@ export default function SeekerDashboard() {
                                     )}
                                     {selectedHospitalForShare.email && (
                                         <p className="flex items-center gap-2">
-                                            <User className="h-4 w-4 text-slate-400 shrink-0" />
+                                            <Mail className="h-4 w-4 text-slate-400 shrink-0" />
                                             {selectedHospitalForShare.email}
                                         </p>
                                     )}
@@ -814,8 +814,15 @@ export default function SeekerDashboard() {
                                                 </span>
                                             </div>
                                             <p className="text-xs text-slate-400 mt-2 line-clamp-3">
-                                                {hospital.address}
+                                                {hospital.address} 
                                             </p>
+                                            {hospital.email && (
+                                                <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 truncate">
+                                                    <Mail className="h-3 w-3" />
+                                                    {hospital.email}
+                                                </p>
+                                            )}
+                                            
                                         </div>
 
                                         {/* Right Side: Action Buttons */}
@@ -847,6 +854,8 @@ export default function SeekerDashboard() {
                                                     <span>No Phone</span>
                                                 </button>
                                             )}
+                                            
+
 
                                             <button
                                                 onClick={() => handleShareDetails(hospital)}

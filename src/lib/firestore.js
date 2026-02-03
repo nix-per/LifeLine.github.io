@@ -345,14 +345,47 @@ export const subscribeToHospitalInventory = (hospitalId, callback) => {
 
 export const subscribeToAllInventory = (callback) => {
   const q = query(collection(db, 'inventory'), where('status', '==', 'active'));
-  return onSnapshot(q, (snapshot) => {
+  return onSnapshot(q, async (snapshot) => {
     const items = [];
-    snapshot.forEach((doc) => {
-      items.push({ id: doc.id, ...doc.data() });
+    // Process all docs in parallel
+    const promises = snapshot.docs.map(async (docSnapshot) => {
+      const data = docSnapshot.data();
+      const item = { id: docSnapshot.id, ...data };
+      
+      // Try to fetch email from users collection using the hospital ID (which matches user ID)
+      try {
+        if (data.hospitalId) {
+             const userRef = doc(db, 'users', data.hospitalId);
+             const userSnap = await getDoc(userRef);
+             if (userSnap.exists()) {
+               item.email = userSnap.data().email;
+             }
+        } else {
+             // Fallback: assume doc.id is the hospitalId/userId if hospitalId field is missing
+             const userRef = doc(db, 'users', docSnapshot.id);
+             const userSnap = await getDoc(userRef);
+             if (userSnap.exists()) {
+               item.email = userSnap.data().email;
+             }
+        }
+      } catch (err) {
+        console.error("Error fetching hospital email:", err);
+      }
+      return item;
     });
-    callback(items);
+
+    const resolvedItems = await Promise.all(promises);
+    callback(resolvedItems);
   });
 };
+//   return onSnapshot(q, (snapshot) => {
+//     const items = [];
+//     snapshot.forEach((doc) => {
+//       items.push({ id: doc.id, ...doc.data() });
+//     });
+//     callback(items);
+//   });
+// };
 
 export const subscribeToMatchingInventory = (bloodTypes, callback) => {
   if (!bloodTypes || bloodTypes.length === 0) return () => {};
